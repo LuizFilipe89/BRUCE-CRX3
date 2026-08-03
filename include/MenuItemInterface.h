@@ -107,7 +107,18 @@ public:
 
 protected:
     const char *_name = "";
-    uint8_t rotation = ROTATION;
+    // Intentionally starts as an impossible rotation value (valid values are
+    // 0-3) so the very first draw() call always sees rotation !=
+    // bruceConfigPins.rotation and runs resetCoordinates() at least once.
+    // Without this, boards whose native orientation is portrait (taller
+    // than wide, e.g. our 128x160 panel) keep the landscape-only default
+    // iconAreaH/iconAreaW/iconCenterX formulas below forever, since
+    // resetCoordinates() is otherwise only triggered by an actual runtime
+    // rotation change - which never happens if the board simply boots
+    // portrait and stays that way. That bug produces a negative iconAreaX
+    // (icon area wider than the real screen), corrupting the left edge of
+    // every menu-category screen.
+    uint8_t rotation = 255;
 
     int iconAreaH =
         ((tftHeight - 2 * BORDER_PAD_Y) % 2 == 0 ? tftHeight - 2 * BORDER_PAD_Y

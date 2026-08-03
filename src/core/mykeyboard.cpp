@@ -1053,6 +1053,147 @@ String generalKeyboard(
                     redraw = true;
                 }
             }
+#elif defined(DEVKIT_CUSTOM_KB) // DevKit Custom: only Up/Down/Sel/Esc physically exist, no
+                                 // dedicated Left/Right. Short press = row (matches the Up/Down
+                                 // label - same as everywhere else in the UI), long press =
+                                 // column, so these 2 buttons alone cover all 4 grid directions.
+                                 // K1(Up) always moves "negative" (row up / col left), K2(Down)
+                                 // always moves "positive" (row down / col right).
+            if (check(SelPress)) {
+                selection_made = true;
+            } else if (check(EscPress)) {
+                // K4 cancels out of the keyboard everywhere else in the UI - match that here
+                // too (the touch/HAS_KEYBOARD paths already use this same "\x1B" sentinel,
+                // callers already check for it to detect a cancel).
+                current_text = "\x1B";
+                break;
+            } else {
+                /* K2 (Down): short = row down (Y++), long = column right (X++), repeats
+                   while held. Once a long press has fired (longNextPress==2), releasing
+                   NEVER counts as a short tap for the rest of this hold - only a
+                   sustained (~250ms) confirmed release ends the gesture. This is what
+                   the single quick "delay+recheck" version got wrong: one lucky-timed
+                   false reading of DownPress mid-hold (a normal InputHandler poll gap,
+                   not a real release) forgot that a long press had already fired and
+                   let the eventual real release be misread as a fresh short tap. */
+                if (longNextPress || DownPress) {
+                    unsigned long now = millis();
+                    if (!longNextPress) {
+                        longNextPress = 1;
+                        LongPress = true;
+                        LongPressTmp = now;
+                    }
+                    delay(1); // does not work without it
+                    if (now - LongPressTmp > 300) {
+                        x++; // Long press action: column right
+                        longNextPress = 2;
+                        LongPressTmp = now;
+                        // Deliberately NOT clearing LongPress/DownPress here - the hold
+                        // is still ongoing (this is a repeat-fire, not a release).
+                    } else if (!DownPress) {
+                        if (longNextPress == 2) {
+                            // Already fired at least one long press this hold - confirm
+                            // this is a REAL release (poll longer than InputHandler's
+                            // own worst-case gap) before trusting it, and never fire a
+                            // short press once we're in this state.
+                            bool released = true;
+                            for (int i = 0; i < 5; i++) {
+                                delay(50);
+                                if (DownPress) {
+                                    released = false;
+                                    break;
+                                }
+                            }
+                            if (released) {
+                                LongPress = false;
+                                longNextPress = 0;
+                            }
+                        } else {
+                            // Never reached the long-press threshold - a genuine short tap.
+                            LongPress = false;
+                            y++; // Short press action: row down
+                            longNextPress = 0;
+                        }
+                    } else {
+                        continue;
+                    }
+                    if (y >= KeyboardHeight) y = -1;
+                    if (y < 0 && x >= buttons_number) x = 0;
+                    if (x >= KeyboardWidth) x = 0;
+                    else if (x < 0) x = KeyboardWidth - 1;
+
+                    // Skip over keys with '\0' value
+                    if (y >= 0 && y < KeyboardHeight && x >= 0 && x < KeyboardWidth) {
+                        while (keys[y][x][caps] == '\0') {
+                            x++;
+                            if (x >= KeyboardWidth) {
+                                x = 0;
+                                y++;
+                                if (y >= KeyboardHeight) {
+                                    y = -1;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    redraw = true;
+                }
+                /* K1 (Up): short = row up (Y--), long = column left (X--) - same
+                   release-confirmation logic as K2 above, mirrored. */
+                if (longPrevPress || UpPress) {
+                    unsigned long now = millis();
+                    if (!longPrevPress) {
+                        longPrevPress = 1;
+                        LongPress = true;
+                        LongPressTmp = now;
+                    }
+                    delay(1); // does not work without it
+                    if (now - LongPressTmp > 300) {
+                        x--; // Long press action: column left
+                        longPrevPress = 2;
+                        LongPressTmp = now;
+                    } else if (!UpPress) {
+                        if (longPrevPress == 2) {
+                            bool released = true;
+                            for (int i = 0; i < 5; i++) {
+                                delay(50);
+                                if (UpPress) {
+                                    released = false;
+                                    break;
+                                }
+                            }
+                            if (released) {
+                                LongPress = false;
+                                longPrevPress = 0;
+                            }
+                        } else {
+                            LongPress = false;
+                            y--; // Short press action: row up
+                            longPrevPress = 0;
+                        }
+                    } else {
+                        continue;
+                    }
+                    if (y < -1) y = KeyboardHeight - 1;
+                    if (y < 0 && x >= buttons_number) x = 0;
+                    if (x < 0) x = KeyboardWidth - 1;
+                    else if (x >= KeyboardWidth) x = 0;
+
+                    // Skip over keys with '\0' value
+                    if (y >= 0 && y < KeyboardHeight && x >= 0 && x < KeyboardWidth) {
+                        while (keys[y][x][caps] == '\0') {
+                            y--;
+                            if (y < 0) {
+                                y = -1;
+                                break;
+                            }
+                        }
+                    }
+
+                    redraw = true;
+                }
+            }
 #elif defined(HAS_5_BUTTONS) // Smoochie and Marauder-Mini
             if (check(SelPress)) {
                 selection_made = true;

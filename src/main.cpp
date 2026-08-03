@@ -323,7 +323,12 @@ void boot_screen_anim() {
             tft.drawRect(2 * tftWidth / 3, tftHeight / 2, 2, 2, bruceConfig.priColor);
         if (!boot_img && (millis() - i > 2700) && (millis() - i) < 2900)
             tft.fillRect(0, 45, tftWidth, tftHeight - 45, bruceConfig.bgColor);
-        if (!boot_img && (millis() - i > 2900) && (millis() - i) < 3400)
+        // Both splash bitmaps below are wider than 128px, so on narrow
+        // (portrait, e.g. 128x160) screens the centering math below goes
+        // negative and corrupts the display. Skip drawing them on screens
+        // too narrow to fit instead of centering off-screen.
+        if (!boot_img && (millis() - i > 2900) && (millis() - i) < 3400 &&
+            tftWidth >= bruce_small_width)
             tft.drawXBitmap(
                 2 * tftWidth / 3 - 30,
                 5 + tftHeight / 2,
@@ -334,7 +339,7 @@ void boot_screen_anim() {
                 bruceConfig.priColor
             );
         if (!boot_img && (millis() - i > 3400) && (millis() - i) < 3600) tft.fillScreen(bruceConfig.bgColor);
-        if (!boot_img && (millis() - i > 3600))
+        if (!boot_img && (millis() - i > 3600) && tftWidth >= bits_width)
             tft.drawXBitmap(
                 (tftWidth - 238) / 2,
                 (tftHeight - 133) / 2,

@@ -103,8 +103,14 @@ switch (rotation) {
             writedata(TFT_MAD_MX | TFT_MAD_MV | TFT_MAD_RGB);
         } else if (tabcolor == INITR_GREENTAB2) {
             writedata(TFT_MAD_MX | TFT_MAD_MV | TFT_MAD_RGB);
-            colstart = 1;
-            rowstart = 2;
+            // Stock 1/2 left a static/glitch sliver on top+left edges.
+            // Raising it (2/3, then 3/4) made the sliver GROW instead of
+            // shrink - with MX|MV mirroring active on this rotation, a
+            // higher offset exposes MORE of the dead GRAM margin, not
+            // less. 0/0 (no correction at all) is what's actually correct
+            // for this panel/rotation - confirmed glitch-free on hardware.
+            colstart = 0;
+            rowstart = 0;
         } else if (tabcolor == INITR_GREENTAB3) {
             writedata(TFT_MAD_MX | TFT_MAD_MV | TFT_MAD_BGR);
             colstart = 1;
