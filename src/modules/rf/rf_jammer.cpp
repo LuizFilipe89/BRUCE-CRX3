@@ -5,7 +5,7 @@
 #include <ELECHOUSE_CC1101_SRC_DRV.h>
 #include <globals.h>
 
-#define MAX_JAMMER_RUNTIME 30000 // 30 seconds max runtime for jammer (safety cutoff)
+#define MAX_JAMMER_RUNTIME 0xFFFFFFFF // runs until user presses ESC
 
 static const uint32_t MAX_SEQUENCE = 50;
 static const uint32_t DURATION_CYCLES = 3;
@@ -415,7 +415,7 @@ void RFJammer::run_noise_jammer() {
 
     // Restore CC1101 to idle
     ELECHOUSE_cc1101.setSidle();
-    ELECHOUSE_cc1101.setPktFormat(3); // Restore async serial mode
+    ELECHOUSE_cc1101.SpiWriteReg(CC1101_PKTCTRL0, 0x30); // Restore async serial mode (direct register write, bypasses library bug)
 }
 
 // ── FREQ SWEEP: Hop around target frequency ─────────────────────

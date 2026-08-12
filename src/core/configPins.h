@@ -225,9 +225,9 @@ public:
     int irRx = RXLED;
 
     // RF
-    int rfTx = GROVE_SDA;
-    int rfRx = GROVE_SCL;
-    int rfModule = M5_RF_MODULE;
+    int rfTx = CC1101_GDO0_PIN;  // GDO0 = GPIO15 (single-pin mode: GDO2 not connected)
+    int rfRx = CC1101_GDO0_PIN;  // same pin for Tx and Rx
+    int rfModule = CC1101_SPI_MODULE;
     float rfFreq = 433.92;
     int rfFxdFreq = 1;
     int rfScanRange = 3;

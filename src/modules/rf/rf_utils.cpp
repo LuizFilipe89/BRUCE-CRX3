@@ -292,7 +292,12 @@ bool initRfModule(String mode, float frequency) {
         //   2 = Random TX mode; sends random data using PN9 generator. Used for test. Works as normal mode,
         // setting 0 (00), in RX.
         //.  3 = Asynchronous serial mode, Data in on GDO0 and data out on either of the GDOx pins.
-        ELECHOUSE_cc1101.setPktFormat(3);
+        // ELECHOUSE_cc1101.setPktFormat(3) is broken (library bit-mask bug: never sets PKT_FORMAT[0],
+        // incorrectly enables WHITE_DATA). Write PKTCTRL0 directly:
+        //   bits[5:4:3] = 0:1:1 = async serial, no whitening
+        //   bit[2] = 0 = no CRC (raw OOK replay)
+        //   bits[1:0] = 0:0 = fixed length
+        ELECHOUSE_cc1101.SpiWriteReg(CC1101_PKTCTRL0, 0x30);
         setMHZ(frequency);
         cc1101_mode_hint = 0;
         Serial.println("cc1101 setMHZ(frequency);");
@@ -314,7 +319,17 @@ bool initRfModule(String mode, float frequency) {
             ioExpander.turnPinOnOff(IO_EXP_CC_RX, HIGH);
             ioExpander.turnPinOnOff(IO_EXP_CC_TX, LOW);
             pinMode(bruceConfigPins.CC1101_bus.io0, INPUT);
+
+            // Start RX from a known state. In asynchronous OOK mode the GDO0
+            // data slicer can chatter while calibration/AGC settles, which used
+            // to look like many signals immediately after opening Scan/Copy.
+            ELECHOUSE_cc1101.setSidle();
+            cc1101WaitForIdle();
+            ELECHOUSE_cc1101.SpiStrobe(CC1101_SFRX);
+            ELECHOUSE_cc1101.SpiStrobe(CC1101_SCAL);
+            cc1101WaitForIdle();
             ELECHOUSE_cc1101.SetRx();
+            vTaskDelay(pdMS_TO_TICKS(20));
             Serial.println("cc1101 SetRx();");
         }
         // else if mode is unspecified wont start TX/RX mode here -> done by the caller
@@ -415,21 +430,28 @@ void setMHZ(float frequency) {
         }
 #endif
         const bool preciseCalibration = (bruceConfigPins.rfFxdFreq);
-        const uint8_t previousMode = preciseCalibration ? ELECHOUSE_cc1101.getMode() : 0;
+        const uint8_t previousMode = ELECHOUSE_cc1101.getMode();
         const uint8_t targetMode =
             preciseCalibration ? (previousMode != 0 ? previousMode : cc1101_mode_hint) : 0;
         const bool isTxProfile = (targetMode == 1);
 
-        if (preciseCalibration && previousMode != 0) ELECHOUSE_cc1101.setSidle();
+        // Frequency registers must only be changed from IDLE. Hopping while RX
+        // remained active could upset the synthesizer and produce false RSSI/
+        // GDO0 activity until the scanner was reopened.
+        if (previousMode != 0) {
+            ELECHOUSE_cc1101.setSidle();
+            cc1101WaitForIdle();
+        }
 
         ELECHOUSE_cc1101.setMHZ(frequency);
 
         if (preciseCalibration) {
             cc1101ApplyPreciseCalibration(frequency, isTxProfile);
 
-            if (previousMode == 1) ELECHOUSE_cc1101.SetTx();
-            else if (previousMode == 2) ELECHOUSE_cc1101.SetRx();
         }
+
+        if (previousMode == 1) ELECHOUSE_cc1101.SetTx();
+        else if (previousMode == 2) ELECHOUSE_cc1101.SetRx();
     }
 }
 
@@ -514,7 +536,6 @@ struct RfCodes selectRecentRfMenu() {
 }
 rmt_channel_handle_t setup_rf_rx() {
     if (!initRfModule("rx", bruceConfigPins.rfFreq)) return NULL;
-    setMHZ(bruceConfigPins.rfFreq);
     rmt_rx_channel_config_t rx_channel_cfg = {};
     rx_channel_cfg.gpio_num = bruceConfigPins.rfModule == CC1101_SPI_MODULE
                                   ? gpio_num_t(bruceConfigPins.CC1101_bus.io0)

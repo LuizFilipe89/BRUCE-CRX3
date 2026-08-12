@@ -65,11 +65,8 @@ int gsetRotation(bool set) {
     options = {
         {"Default",         [&]() { result = ROTATION; }                        },
         {"Landscape (180)", [&]() { result = ROTATION + mask; }                 },
-#if TFT_WIDTH >= 170 && TFT_HEIGHT >= 240
         {"Portrait (+90)",  [&]() { result = ROTATION > 0 ? ROTATION - 1 : 3; } },
         {"Portrait (-90)",  [&]() { result = ROTATION == 3 ? 0 : ROTATION + 1; }},
-
-#endif
     };
     addOptionToMainMenu();
     if (set) loopOptions(options);
@@ -87,21 +84,15 @@ int gsetRotation(bool set) {
     }
     returnToMenu = true;
 
-    if (result & 0b01) { // if 1 or 3
-        tftWidth = TFT_HEIGHT;
+    // Always use the dimensions reported by the active display driver.
+    // Compile-time TFT_WIDTH/TFT_HEIGHT describe the native panel and were
+    // easy to get wrong for portrait-native displays such as ST7735 128x160.
+    tftWidth = tft.width();
 #if defined(HAS_TOUCH)
-        tftHeight = TFT_WIDTH - 20;
+    tftHeight = tft.height() - 20;
 #else
-        tftHeight = TFT_WIDTH;
+    tftHeight = tft.height();
 #endif
-    } else { // if 2 or 0
-        tftWidth = TFT_WIDTH;
-#if defined(HAS_TOUCH)
-        tftHeight = TFT_HEIGHT - 20;
-#else
-        tftHeight = TFT_HEIGHT;
-#endif
-    }
     return result;
 }
 
@@ -691,8 +682,9 @@ void setRFModuleMenu() {
             );
 #endif
         }
+        // Set rfModule BEFORE initRfModule so it enters the CC1101 path
+        bruceConfigPins.setRfModule(CC1101_SPI_MODULE);
         if (initRfModule()) {
-            bruceConfigPins.setRfModule(CC1101_SPI_MODULE);
             deinitRfModule();
             if (pins_setup == 1) AUX_SPI.end();
             return;

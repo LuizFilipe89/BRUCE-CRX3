@@ -446,7 +446,12 @@ void setup() {
     Serial.setRxBufferSize(
         SAFE_STACK_BUFFER_SIZE / 4
     ); // Must be invoked before Serial.begin(). Default is 256 chars
+#ifndef DEVKIT_CUSTOM_KB
+    // DevKit-Custom: GPIO1 (TX0) and GPIO3 (RX0) are used for K3/K2 buttons.
+    // Serial.begin() reconfigures them as UART, breaking button input and
+    // causing menu freezes. Serial commands are disabled on this board.
     Serial.begin(115200);
+#endif
 
     log_d("Total heap: %d", ESP.getHeapSize());
     log_d("Free heap: %d", ESP.getFreeHeap());

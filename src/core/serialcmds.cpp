@@ -60,7 +60,10 @@ void handleSerialCommands(SerialCli &serialCli) {
 }
 
 void _serialCmdsTaskLoop(void *pvParameters) {
+#ifndef DEVKIT_CUSTOM_KB
+    // DevKit-Custom: GPIO1/GPIO3 used for buttons, skip Serial init
     Serial.begin(115200);
+#endif
     while (1) {
         handleSerialCommands(serialCli);
         vTaskDelay(pdMS_TO_TICKS(10));

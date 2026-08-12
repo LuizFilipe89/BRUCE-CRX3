@@ -14,13 +14,13 @@ static const uint8_t TXD2 = 1;
 static const uint8_t RXD2 = 2;
 
 static const uint8_t SDA = 13;
-static const uint8_t SCL = 15;
+static const uint8_t SCL = 15;  // Default I2C - NOT used (GROVE_SCL=26 is used instead)
 
 // Modified elsewhere
-static const uint8_t SS = -1;
-static const uint8_t MOSI = -1;
-static const uint8_t MISO = -1;
-static const uint8_t SCK = -1;
+static const uint8_t SS = 1;
+static const uint8_t MOSI = 23;
+static const uint8_t MISO = 19;
+static const uint8_t SCK = 18;
 
 static const uint8_t G0 = 0;
 static const uint8_t G1 = 1;
@@ -49,31 +49,30 @@ static const uint8_t G46 = 46;
 static const uint8_t ADC1 = 7;
 static const uint8_t ADC2 = 8;
 
-#define RGB_LED 21
+#define RGB_LED -1  // No RGB LED on this board
 
-#define BAD_TX 21
-#define BAD_RX 22
+#define BAD_TX 26   // Not wired - spare GPIO
+#define BAD_RX 27   // Not wired - spare GPIO
 
-// SERIAL (GPS) dedicated pins - no GPS on this board, kept as placeholders
-#define SERIAL_TX 21
-#define SERIAL_RX 22
-#define GPS_SERIAL_TX SERIAL_TX
-#define GPS_SERIAL_RX SERIAL_RX
+// No GPS on this board - SERIAL pins unused (GPIO1/GPIO3 are used for K3/K2)
+#define SERIAL_TX -1
+#define SERIAL_RX -1
+#define GPS_SERIAL_TX -1
+#define GPS_SERIAL_RX -1
 
 // 4 physical buttons (K1-K4), see dispositivo-display-esp32.pdf.
 // Only 4 of Bruce's 5 logical roles are wired; L_BTN points at a spare
 // GPIO with internal pull-up so it always reads "not pressed" (see
 // interface.cpp).
 #define HAS_BTN 1
-#define SEL_BTN 25 // K3
-// K1/K2 swapped vs their GPIO numbering: in landscape (ROTATION 3) the
-// physical top/bottom feel of K1/K2 is reversed from portrait, so the pin
-// assigned to UP_BTN vs DW_BTN is swapped here to match what feels right
-// on screen, not the raw K1/K2 labels silkscreened on the board.
-#define UP_BTN 26  // K2
-#define DW_BTN 27  // K1
-#define R_BTN 33   // K4
-#define L_BTN 32   // Not physically wired - spare pin, always "not pressed"
+// K1=Up, K2=Down, K3=Select, K4=Escape/Cancel
+// Correspondência física pode estar trocada por erro de solda -
+// testar cada botão e ajustar aqui se necessário.
+#define SEL_BTN 1   // K3 (TX0 - cuidado durante flash)
+#define UP_BTN 21   // K1
+#define DW_BTN 3    // K2 (RX0 - cuidado durante flash)
+#define R_BTN 22    // K4
+#define L_BTN 32    // Not physically wired - spare pin, always "not pressed"
 // Only 4 real buttons, no dedicated Left/Right - NOT a true 5-button board.
 // Uses a dedicated short/long-press keyboard nav scheme (see mykeyboard.cpp)
 // instead of HAS_5_BUTTONS, which assumes independent Left/Right buttons.
@@ -85,12 +84,14 @@ static const uint8_t ADC2 = 8;
 #define LED_ON HIGH
 #define LED_OFF LOW
 
-// No CC1101/NRF24 hardware on this board
-#define CC1101_GDO0_PIN -1
-#define CC1101_SS_PIN -1
-#define CC1101_MOSI_PIN SPI_MOSI_PIN
-#define CC1101_SCK_PIN SPI_SCK_PIN
-#define CC1101_MISO_PIN SPI_MISO_PIN
+// CC1101 (Ebyte E07-M1101D-SMA V2.0, 433MHz)
+// EXCLUSIVE SPI bus - does NOT share SCK/MOSI with display.
+// GDO2 not connected => single-pin mode (GDO0 used for both Tx and Rx).
+#define CC1101_SCK_PIN 19
+#define CC1101_MOSI_PIN 17
+#define CC1101_MISO_PIN 16
+#define CC1101_SS_PIN 25
+#define CC1101_GDO0_PIN 15
 
 #define NRF24_CE_PIN -1
 #define NRF24_SS_PIN -1
@@ -128,6 +129,6 @@ static const uint8_t ADC2 = 8;
 #define SPI_SCK_PIN 18
 #define SPI_MISO_PIN 19
 #define SPI_MOSI_PIN 23
-#define SPI_SS_PIN 1
+#define SPI_SS_PIN -1  // Not used - display is write-only (no MISO/SS)
 
 #endif /* Pins_Arduino_h */

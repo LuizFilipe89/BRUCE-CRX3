@@ -309,10 +309,10 @@ void rf_raw_record_create(RawRecording &recorded, bool &returnToMenu) {
     ESP_ERROR_CHECK(rmt_rx_register_event_callbacks(rx_ch, &cbs, receive_queue));
     ESP_ERROR_CHECK(rmt_enable(rx_ch));
     rmt_receive_config_t receive_config = {
-        .signal_range_min_ns = 3000,     // 10us minimum signal duration
-        .signal_range_max_ns = 12000000, // 24ms maximum signal duration
+        .signal_range_min_ns = 3000,     // 3us minimum signal duration
+        .signal_range_max_ns = 30000000, // 30ms maximum (matches decoder, allows gap between frames)
     };
-    rmt_symbol_word_t item[64];
+    rmt_symbol_word_t item[256]; // 256 symbols = 512 half-pulses, enough for complex protocols
     rmt_rx_done_event_data_t rx_data;
     ESP_ERROR_CHECK(rmt_receive(rx_ch, item, sizeof(item), &receive_config));
     Serial.println("RMT Initialized");

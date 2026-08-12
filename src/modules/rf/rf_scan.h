@@ -24,7 +24,7 @@ public:
     /////////////////////////////////////////////////////////////////////////////////////
     // Constructor
     /////////////////////////////////////////////////////////////////////////////////////
-    RFScan();
+    explicit RFScan(bool autoSaveMode = false);
     ~RFScan();
 
     /////////////////////////////////////////////////////////////////////////////////////
@@ -54,7 +54,9 @@ private:
     float found_freq = 0.f;
     int rssi = -80;
     int rssiThreshold = -65;
-    uint64_t lastSavedKey = 0;
+    uint64_t lastSavedFingerprint = 0;
+    unsigned long lastSavedMs = 0;
+    unsigned long ignoreRxUntilMs = 0;
 
     /////////////////////////////////////////////////////////////////////////////////////
     // State management
@@ -69,7 +71,8 @@ private:
     bool read_raw(const std::vector<int> &durations);
     bool is_m5_duplicate_capture(const RfCodes &data);
     void replay_signal(bool asRaw = false);
-    void save_signal(bool asRaw = false);
+    bool save_signal(bool asRaw = false);
+    bool should_auto_save() const;
     void reset_signals();
     void set_threshold();
     // void set_range(); // Using similar function from rf_utils.h

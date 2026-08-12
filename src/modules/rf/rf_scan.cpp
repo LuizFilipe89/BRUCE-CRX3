@@ -13,6 +13,10 @@
 #define RF_M5_SCAN_RESYNC_MS 20
 #define RF_M5_RAW_MIN_BITS 24
 #define RF_M5_RAW_MIN_TE_US 300
+#define RF_CC1101_RAW_MIN_BITS 16
+#define RF_CC1101_RAW_MIN_TE_US 80
+#define RF_CC1101_RX_SETTLE_MS 150
+#define RF_AUTO_SAVE_DUPLICATE_MS 1200
 
 static void rf_clear_nav_state() {
     NextPress = false;
@@ -30,7 +34,12 @@ static bool rf_m5_raw_is_plausible(bool hasCrc, int rawBits, int rawTe) {
     return hasCrc && rawBits >= RF_M5_RAW_MIN_BITS && rawTe >= RF_M5_RAW_MIN_TE_US;
 }
 
-RFScan::RFScan() {
+static bool rf_cc1101_raw_is_plausible(bool hasCrc, int rawBits, int rawTe) {
+    return hasCrc && rawBits >= RF_CC1101_RAW_MIN_BITS && rawTe >= RF_CC1101_RAW_MIN_TE_US;
+}
+
+RFScan::RFScan(bool autoSaveMode) : autoSave(autoSaveMode) {
+    if (autoSave) title = "RF Scan Save";
     if (bruceConfigPins.rfModule == M5_RF_MODULE) ReadRAW = false;
     setup();
 }
@@ -45,9 +54,11 @@ void RFScan::setup() {
     returnToMenu = false;
     exitRequested = false;
 
-    if (!initRfModule("rx", bruceConfigPins.rfFreq)) { return; }
-
+    // RfRxSession::begin() initializes the radio through setup_rf_rx(). Calling
+    // initRfModule() here as well reset the CC1101 twice on every entry and could
+    // leave its OOK slicer producing a burst of startup noise.
     enable_receive();
+    if (!_rx.active()) return;
 
     if (bruceConfigPins.rfScanRange < 0 || bruceConfigPins.rfScanRange > 3) {
         bruceConfigPins.setRfScanRange(3);
@@ -108,14 +119,17 @@ void RFScan::loop() {
 
         std::vector<int> durations;
         if (_rx.poll(durations)) {
+            // Ignore captures produced while the CC1101 AGC/OOK slicer is
+            // settling. They are especially common on the first menu entry.
+            if (bruceConfigPins.rfModule == CC1101_SPI_MODULE && millis() < ignoreRxUntilMs) continue;
+
             bool captured = false;
             if (!ReadRAW) {
                 captured = decode_signal(durations);
-                if (captured && autoSave && (lastSavedKey != received.key || received.key == 0)) save_signal();
             } else {
                 captured = read_raw(durations);
-                if (captured && autoSave && (lastSavedKey != received.key || received.key == 0)) save_signal();
             }
+            if (captured && autoSave && should_auto_save()) save_signal();
             if (captured && bruceConfigPins.rfModule == M5_RF_MODULE) {
                 _rx.end();
                 rf_clear_nav_state();
@@ -139,6 +153,7 @@ void RFScan::enable_receive() {
     // (Re)start the native RMT RX session used to capture signals.
     _rx.end();
     _rx.begin();
+    ignoreRxUntilMs = millis() + RF_CC1101_RX_SETTLE_MS;
 }
 
 void RFScan::init_freqs() {
@@ -329,6 +344,18 @@ bool RFScan::read_raw(const std::vector<int> &durations) {
             );
             return false;
         }
+        if (bruceConfigPins.rfModule == CC1101_SPI_MODULE &&
+            !rf_cc1101_raw_is_plausible(hasCrc, rawBits, rawTe)) {
+            RF_DBG(
+                "cc1101 raw discard: crc=%d bits=%d te=%d minBits=%d minTe=%d",
+                (int)hasCrc,
+                rawBits,
+                rawTe,
+                RF_CC1101_RAW_MIN_BITS,
+                RF_CC1101_RAW_MIN_TE_US
+            );
+            return false;
+        }
         received.preset = "Ook270Async";
         received.protocol = "RAW";
         received.key = crc;
@@ -481,12 +508,42 @@ void RFScan::replay_signal(bool asRaw) {
     if (received.fix != 0 && !asRaw) { received.keeloq_step(1); }
 }
 
-void RFScan::save_signal(bool asRaw) {
+bool RFScan::save_signal(bool asRaw) {
     asRaw = asRaw || received.protocol == "RAW";
     Serial.println(asRaw ? "rfSaveSignal RAW true" : "rfSaveSignal RAW false");
     decimalToHexString(received.key, hexString);
-    rfSaveSignal(found_freq, received, asRaw, hexString, autoSave);
-    lastSavedKey = received.key;
+    if (!rfSaveSignal(found_freq, received, asRaw, hexString, autoSave)) return false;
+
+    // Decoded/repeated signals already have a stable key. Unknown RAW signals
+    // (common with automotive rolling-code remotes) use a content fingerprint
+    // so they can be saved without treating every key=0 capture as identical.
+    uint64_t fingerprint = received.key;
+    if (fingerprint == 0) {
+        fingerprint = 1469598103934665603ULL; // FNV-1a 64-bit offset basis
+        for (size_t i = 0; i < received.data.length(); i++) {
+            fingerprint ^= (uint8_t)received.data[i];
+            fingerprint *= 1099511628211ULL;
+        }
+    }
+    lastSavedFingerprint = fingerprint;
+    lastSavedMs = millis();
+    return true;
+}
+
+bool RFScan::should_auto_save() const {
+    // One RMT capture normally contains all repeated frames of a single button
+    // press. Suppress only an immediately repeated capture of the same signal;
+    // the same remote can be saved again after the cooldown.
+    uint64_t fingerprint = received.key;
+    if (fingerprint == 0) {
+        fingerprint = 1469598103934665603ULL;
+        for (size_t i = 0; i < received.data.length(); i++) {
+            fingerprint ^= (uint8_t)received.data[i];
+            fingerprint *= 1099511628211ULL;
+        }
+    }
+    return lastSavedMs == 0 || fingerprint != lastSavedFingerprint ||
+           millis() - lastSavedMs >= RF_AUTO_SAVE_DUPLICATE_MS;
 }
 
 void RFScan::reset_signals() {
@@ -736,6 +793,7 @@ bool rfSaveSignal(float frequency, RfCodes codes, bool raw, char *key, bool auto
         if (!autoSave) displaySuccess(file.path());
     } else {
         displayError("Error saving file", true);
+        return false;
     }
 
     file.close();

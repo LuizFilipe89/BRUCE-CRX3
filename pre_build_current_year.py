@@ -9,7 +9,15 @@ def generate_build_header():
     output_path = os.path.join("include", "current_year.h")
     os.makedirs("include", exist_ok=True)
 
-    with open(output_path, "w") as f:
+    # Preserve the timestamp when the year has not changed. Rewriting this
+    # widely included header on every invocation invalidates otherwise clean
+    # incremental builds and forces PlatformIO to restore/rebuild objects.
+    if os.path.exists(output_path):
+        with open(output_path, "r", encoding="utf-8") as f:
+            if f.read() == header_content:
+                return
+
+    with open(output_path, "w", encoding="utf-8", newline="\n") as f:
         f.write(header_content)
 
 
