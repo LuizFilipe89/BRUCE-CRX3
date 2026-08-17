@@ -198,35 +198,35 @@ void updateHashUI() {
     tft.setTextColor(bruceConfig.priColor, bruceConfig.bgColor);
     tft.setCursor(10, BORDER_PAD_Y + FM * LH);
     tft.print("NTLM: ");
-    tft.setTextSize(2);
+    tft.setTextSize(responsiveTextSize(2));
     tft.println(hashCount);
 
     // 2) User
     tft.setTextSize(FP);
     tft.setCursor(10, tft.getCursorY());
     tft.print("User: ");
-    tft.setTextSize(2);
+    tft.setTextSize(responsiveTextSize(2));
     tft.println(lastUser);
 
     // 3) Domain
     tft.setTextSize(FP);
     tft.setCursor(10, tft.getCursorY());
     tft.print("Domain: ");
-    tft.setTextSize(2);
+    tft.setTextSize(responsiveTextSize(2));
     tft.println(lastDomain);
 
     // 4) Client (hostname)
     tft.setTextSize(FP);
     tft.setCursor(10, tft.getCursorY());
     tft.print("Client: ");
-    tft.setTextSize(2);
+    tft.setTextSize(responsiveTextSize(2));
     tft.println(lastClient);
 
     // 5) Query (NBNS/LLMNR + name)
     tft.setTextSize(FP);
     tft.setCursor(10, tft.getCursorY());
     tft.print(lastQueryProtocol + ": ");
-    tft.setTextSize(2);
+    tft.setTextSize(responsiveTextSize(2));
     tft.println(lastQueryName);
 }
 

@@ -10,6 +10,21 @@
 
 #define MAX_MENU_SIZE (int)(tftHeight / 25)
 
+String fitTextToWidth(const String &text, int maxWidth, uint8_t textSize) {
+    if (maxWidth <= 0 || text.isEmpty()) return "";
+    const int charWidth = max(1, (int)LW * (int)textSize);
+    const int maxChars = maxWidth / charWidth;
+    if (maxChars <= 0) return "";
+    if ((int)text.length() <= maxChars) return text;
+    if (maxChars <= 2) return text.substring(0, maxChars);
+    return text.substring(0, maxChars - 2) + "..";
+}
+
+uint8_t responsiveTextSize(uint8_t preferredSize) {
+    if (tftHeight > tftWidth && preferredSize > FP) return preferredSize - 1;
+    return preferredSize;
+}
+
 // Send the ST7789 into or out of sleep mode
 void panelSleep(bool on) {
 #if defined(ST7789_2_DRIVER) || defined(ST7789_DRIVER)
@@ -95,6 +110,7 @@ void resetTftDisplay(int x, int y, uint16_t fc, int size, uint16_t bg, uint16_t 
     tft.setTextSize(size);
     tft.setTextColor(fc, bg);
     tft.setTextDatum(0);
+    tft.setTextWrap(true, false);
 }
 
 /***************************************************************************************
@@ -150,12 +166,14 @@ std::vector<String> wrapText(const String& text, int maxCharsPerLine) {
                 break;
             }
         }
-        if (splitPos <= 0) {
+        bool foundBoundary = splitPos > 0;
+        if (!foundBoundary) {
             // No word boundary found, force split at max
             splitPos = maxCharsPerLine;
         }
         lines.push_back(remaining.substring(0, splitPos));
-        remaining = remaining.substring(splitPos + 1);
+        remaining = remaining.substring(splitPos + (foundBoundary ? 1 : 0));
+        while (remaining.startsWith(" ")) remaining.remove(0, 1);
     }
     return lines;
 }
@@ -442,34 +460,15 @@ void padprintln(const String &s, int16_t padx) {
         return;
     }
 
-    String buff;
-    size_t start = 0;
     int _maxCharsInLine = (tftWidth - (padx + 1) * BORDER_PAD_X) / (FP * LW);
-
-    // automatically split into multiple lines
-    while (!(buff = s.substring(start, start + _maxCharsInLine)).isEmpty()) {
+    std::vector<String> lines = wrapText(s, max(1, _maxCharsInLine));
+    for (const String &line : lines) {
         tft.setCursor(padx * BORDER_PAD_X, tft.getCursorY());
-        tft.println(buff);
-        start += buff.length();
+        tft.println(line);
     }
 }
 void padprintln(const char str[], int16_t padx) {
-    if (strcmp(str, "") == 0) {
-        tft.setCursor(padx * BORDER_PAD_X, tft.getCursorY());
-        tft.println(str);
-        return;
-    }
-
-    String buff;
-    size_t start = 0;
-    int _maxCharsInLine = (tftWidth - (padx + 1) * BORDER_PAD_X) / (FP * LW);
-
-    // automatically split into multiple lines
-    while (!(buff = String(str).substring(start, start + _maxCharsInLine)).isEmpty()) {
-        tft.setCursor(padx * BORDER_PAD_X, tft.getCursorY());
-        tft.println(buff);
-        start += buff.length();
-    }
+    padprintln(String(str), padx);
 }
 void padprintln(char c, int16_t padx) {
     tft.setCursor(padx * BORDER_PAD_X, tft.getCursorY());
@@ -873,7 +872,7 @@ void drawSubmenu(int index, std::vector<Option> &options, const char *title) {
     tft.setTextSize(FP);
     tft.drawPixel(0, 0, 0);
     tft.fillRect(6, 30, tftWidth - 12, 8 * FP, bruceConfig.bgColor);
-    tft.drawString(title, 12, 30);
+    tft.drawString(fitTextToWidth(String(title), tftWidth - 24, FP), 12, 30);
 
     // middle of the drawing area
     int middle = 25 /*status*/ + (tftHeight - 30 /*status + bottom margin*/) / 2;
@@ -888,7 +887,7 @@ void drawSubmenu(int index, std::vector<Option> &options, const char *title) {
 #endif
     // Previous item
     int firstIndex = index - 1 >= 0 ? index - 1 : menuSize - 1;
-    const char *firstOption = options[firstIndex].label.c_str();
+    String firstOption = fitTextToWidth(options[firstIndex].label, tftWidth - 18, FM);
     tft.setTextColor(options[firstIndex].enabled ? bruceConfig.secColor : TFT_DARKGREY);
     tft.fillRect(6, middle_up, tftWidth - 12, 8 * FM, bruceConfig.bgColor);
     tft.drawCentreString(firstOption, tftWidth / 2, middle_up, SMOOTH_FONT);
@@ -907,16 +906,18 @@ void drawSubmenu(int index, std::vector<Option> &options, const char *title) {
         selectedTextSize * LH + 5,
         bruceConfig.bgColor
     );
-    tft.drawCentreString(options[index].label, tftWidth / 2, middle - selectedTextSize * LH / 2, SMOOTH_FONT);
+    String selectedOption = fitTextToWidth(options[index].label, tftWidth - 18, selectedTextSize);
+    tft.drawCentreString(selectedOption, tftWidth / 2, middle - selectedTextSize * LH / 2, SMOOTH_FONT);
+    const int selectedWidth = min((int)selectedOption.length() * selectedTextSize * LW, (int)tftWidth - 18);
     tft.drawFastHLine(
-        tftWidth / 2 - strlen(options[index].label.c_str()) * selectedTextSize * LW / 2,
+        tftWidth / 2 - selectedWidth / 2,
         middle + selectedTextSize * LH / 2 + 1,
-        strlen(options[index].label.c_str()) * selectedTextSize * LW,
+        selectedWidth,
         bruceConfig.priColor
     );
     // Next Item
     int thirdIndex = index + 1 < menuSize ? index + 1 : 0;
-    const char *thirdOption = options[thirdIndex].label.c_str();
+    String thirdOption = fitTextToWidth(options[thirdIndex].label, tftWidth - 18, FM);
     tft.setTextSize(FM);
     tft.setTextColor(options[thirdIndex].enabled ? bruceConfig.secColor : TFT_DARKGREY);
     tft.fillRect(6, middle_down, tftWidth - 12, 8 * FM, bruceConfig.bgColor);
@@ -1025,6 +1026,7 @@ void drawMainBorder(bool clear) {
     }
     setTftDisplay(12, 12, bruceConfig.priColor, 1, bruceConfig.bgColor);
     tft.setTextDatum(0);
+    tft.setTextWrap(true, false);
 
     // if(wifiConnected) {tft.print(timeStr);} else {tft.print("BRUCE 1.0b");}
 
@@ -1059,16 +1061,17 @@ void printTitle(const String &title) {
 }
 
 void printSubtitle(const String &subtitle, bool withLine) {
-    int16_t cursorX = (tftWidth - (subtitle.length() * FP * LW)) / 2;
+    String visible = fitTextToWidth(subtitle, tftWidth - 2 * BORDER_PAD_X, FP);
+    int16_t cursorX = max(BORDER_PAD_X, (tftWidth - (int)(visible.length() * FP * LW)) / 2);
     tft.setTextColor(bruceConfig.priColor, bruceConfig.bgColor);
     tft.setTextSize(FP);
 
     tft.setCursor(cursorX, BORDER_PAD_Y + FM * LH);
-    tft.println(subtitle);
+    tft.println(visible);
 
     if (withLine) {
         String line = "";
-        for (byte i = 0; i < subtitle.length(); i++) line += "-";
+        for (byte i = 0; i < visible.length(); i++) line += "-";
 
         tft.setCursor(cursorX, tft.getCursorY());
         tft.println(line);
@@ -1077,13 +1080,23 @@ void printSubtitle(const String &subtitle, bool withLine) {
 
 void printFootnote(const String &text) {
     tft.setTextSize(FP);
-    tft.drawRightString(text, tftWidth - BORDER_PAD_X, tftHeight - BORDER_PAD_X - FP * LH, SMOOTH_FONT);
+    tft.drawRightString(
+        fitTextToWidth(text, tftWidth - 2 * BORDER_PAD_X, FP),
+        tftWidth - BORDER_PAD_X,
+        tftHeight - BORDER_PAD_X - FP * LH,
+        SMOOTH_FONT
+    );
 }
 
 void printCenterFootnote(const String &text) {
     tft.fillRect(10, tftHeight - BORDER_PAD_X - FP * LH, tftWidth - 20, FP * LH, bruceConfig.bgColor);
     tft.setTextSize(FP);
-    tft.drawCentreString(text, tftWidth / 2, tftHeight - BORDER_PAD_X - FP * LH, SMOOTH_FONT);
+    tft.drawCentreString(
+        fitTextToWidth(text, tftWidth - 2 * BORDER_PAD_X, FP),
+        tftWidth / 2,
+        tftHeight - BORDER_PAD_X - FP * LH,
+        SMOOTH_FONT
+    );
 }
 
 void drawBatteryStatus(uint8_t bat) {

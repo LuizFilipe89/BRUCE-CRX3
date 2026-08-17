@@ -3017,7 +3017,7 @@ String selectFileFromSD() {
             tft.drawRect(5, 5, tftWidth - 10, tftHeight - 10, TFT_WHITE);
 
             tft.setTextColor(TFT_WHITE, bruceConfig.bgColor);
-            tft.setTextSize(2);
+            tft.setTextSize(responsiveTextSize(2));
             tft.setCursor((tftWidth - strlen("SD CARD FILES") * 12) / 2, 15);
             tft.print("SD CARD FILES");
             tft.setTextSize(1);
@@ -3149,7 +3149,7 @@ String getScriptFromUser() {
             tft.drawRect(5, 5, tftWidth - 10, tftHeight - 10, TFT_WHITE);
 
             tft.setTextColor(TFT_WHITE, bruceConfig.bgColor);
-            tft.setTextSize(2);
+            tft.setTextSize(responsiveTextSize(2));
             tft.setCursor((tftWidth - strlen("SELECT SCRIPT") * 12) / 2, 15);
             tft.print("SELECT SCRIPT");
             tft.setTextSize(1);
@@ -4178,7 +4178,7 @@ String selectTargetFromScan(const char *title) {
     tft.drawRect(5, 5, tftWidth - 10, tftHeight - 10, TFT_WHITE);
 
     tft.setTextColor(TFT_WHITE, bruceConfig.bgColor);
-    tft.setTextSize(2);
+    tft.setTextSize(responsiveTextSize(2));
     String titleStr = String(title);
     int maxTitleWidth = tftWidth - 20;
     if (tft.textWidth(titleStr.c_str()) > maxTitleWidth) {
@@ -4285,7 +4285,7 @@ String selectTargetFromScan(const char *title) {
         tft.fillScreen(TFT_YELLOW);
         tft.drawRect(5, 5, tftWidth - 10, tftHeight - 10, TFT_BLACK);
         tft.setTextColor(TFT_BLACK, TFT_YELLOW);
-        tft.setTextSize(2);
+        tft.setTextSize(responsiveTextSize(2));
         tft.setCursor((tftWidth - tft.textWidth("NO DEVICES")) / 2, 15);
         tft.print("NO DEVICES");
         tft.setTextSize(1);
@@ -4339,7 +4339,7 @@ String selectTargetFromScan(const char *title) {
             tft.drawRect(5, 5, tftWidth - 10, tftHeight - 10, TFT_WHITE);
 
             tft.setTextColor(TFT_WHITE, bruceConfig.bgColor);
-            tft.setTextSize(2);
+            tft.setTextSize(responsiveTextSize(2));
             tft.setCursor((tftWidth - tft.textWidth("SELECT DEVICE")) / 2, 15);
             tft.print("SELECT DEVICE");
             tft.setTextSize(1);
@@ -4463,7 +4463,7 @@ String selectMultipleTargetsFromScan(const char *title, std::vector<NimBLEAddres
         tft.drawRect(5, 5, tftWidth - 10, tftHeight - 10, TFT_WHITE);
 
         tft.setTextColor(TFT_WHITE, bruceConfig.bgColor);
-        tft.setTextSize(2);
+        tft.setTextSize(responsiveTextSize(2));
         tft.setCursor((tftWidth - tft.textWidth(title)) / 2, 15);
         tft.print(title);
         tft.setTextSize(1);
@@ -4869,13 +4869,13 @@ void showWelcomeScreen() {
     if (welcomeShown) return;
 
     tft.fillScreen(bruceConfig.bgColor);
-    tft.setTextSize(4);
+    tft.setTextSize(responsiveTextSize(4));
     tft.setTextColor(TFT_PURPLE, bruceConfig.bgColor);
     tft.setCursor((tftWidth - tft.textWidth("BRUCE")) / 2, 35);
     tft.print("BRUCE");
 
     tft.setTextColor(TFT_BLUE, bruceConfig.bgColor);
-    tft.setTextSize(2);
+    tft.setTextSize(responsiveTextSize(2));
     tft.setCursor((tftWidth - tft.textWidth("BLE SUITE")) / 2, 80);
     tft.print("BLE SUITE");
 
@@ -4929,7 +4929,7 @@ void BleSuiteMenu() {
             tft.drawRect(5, 5, tftWidth - 10, tftHeight - 10, TFT_WHITE);
 
             tft.setTextColor(TFT_WHITE, bruceConfig.bgColor);
-            tft.setTextSize(2);
+            tft.setTextSize(responsiveTextSize(2));
             tft.setCursor((tftWidth - tft.textWidth("BLE SUITE")) / 2, 15);
             tft.print("BLE SUITE");
             tft.setTextSize(1);
@@ -5076,7 +5076,7 @@ int showSubMenu(const char *title, const char *options[], int optionCount) {
     tft.drawRect(5, 5, tftWidth - 10, tftHeight - 10, TFT_WHITE);
 
     tft.setTextColor(TFT_WHITE, bruceConfig.bgColor);
-    tft.setTextSize(2);
+    tft.setTextSize(responsiveTextSize(2));
     tft.setTextWrap(true, true);
     tft.setCursor((tftWidth - tft.textWidth(title)) / 2, 15);
     tft.print(title);
@@ -5770,7 +5770,7 @@ void runAudioControlTest(NimBLEAddress target) {
             tft.drawRect(5, 5, tftWidth - 10, tftHeight - 10, TFT_WHITE);
 
             tft.setTextColor(TFT_WHITE, bruceConfig.bgColor);
-            tft.setTextSize(2);
+            tft.setTextSize(responsiveTextSize(2));
             tft.setCursor((tftWidth - tft.textWidth("AUDIO CONTROL TEST")) / 2, 15);
             tft.print("AUDIO CONTROL TEST");
             tft.setTextSize(1);
@@ -5935,7 +5935,7 @@ void showAttackProgress(const char *message, uint16_t color) {
     tft.drawRect(5, 5, tftWidth - 10, tftHeight - 10, TFT_WHITE);
 
     tft.setTextColor(TFT_WHITE, bruceConfig.bgColor);
-    tft.setTextSize(2);
+    tft.setTextSize(responsiveTextSize(2));
     tft.setCursor((tftWidth - tft.textWidth("BLE SUITE")) / 2, 15);
     tft.print("BLE SUITE");
     tft.setTextSize(1);
@@ -5987,7 +5987,7 @@ void showAttackResult(bool success, const char *message) {
         tft.fillScreen(TFT_GREEN);
         tft.drawRect(5, 5, tftWidth - 10, tftHeight - 10, TFT_BLACK);
         tft.setTextColor(TFT_WHITE, TFT_GREEN);
-        tft.setTextSize(2);
+        tft.setTextSize(responsiveTextSize(2));
         tft.setCursor((tftWidth - tft.textWidth("SUCCESS")) / 2, 15);
         tft.print("SUCCESS");
         tft.setTextSize(1);
@@ -5996,7 +5996,7 @@ void showAttackResult(bool success, const char *message) {
         tft.fillScreen(TFT_RED);
         tft.drawRect(5, 5, tftWidth - 10, tftHeight - 10, TFT_BLACK);
         tft.setTextColor(TFT_WHITE, TFT_RED);
-        tft.setTextSize(2);
+        tft.setTextSize(responsiveTextSize(2));
         tft.setCursor((tftWidth - tft.textWidth("FAILED")) / 2, 15);
         tft.print("FAILED");
         tft.setTextSize(1);
@@ -6052,7 +6052,7 @@ bool confirmAttack(const char *targetName) {
     tft.drawRect(5, 5, tftWidth - 10, tftHeight - 10, TFT_WHITE);
 
     tft.setTextColor(TFT_WHITE, bruceConfig.bgColor);
-    tft.setTextSize(2);
+    tft.setTextSize(responsiveTextSize(2));
     tft.setCursor((tftWidth - tft.textWidth("CONFIRM ATTACK")) / 2, 15);
     tft.print("CONFIRM ATTACK");
     tft.setTextSize(1);
@@ -6087,7 +6087,7 @@ bool requireSimpleConfirmation(const char *message) {
     tft.drawRect(5, 5, tftWidth - 10, tftHeight - 10, TFT_WHITE);
 
     tft.setTextColor(TFT_WHITE, bruceConfig.bgColor);
-    tft.setTextSize(2);
+    tft.setTextSize(responsiveTextSize(2));
     tft.setCursor((tftWidth - tft.textWidth("CONFIRM")) / 2, 15);
     tft.print("CONFIRM");
     tft.setTextSize(1);
@@ -6151,7 +6151,7 @@ int8_t showAdaptiveMessage(
     tft.fillScreen(bruceConfig.bgColor);
     tft.drawRect(5, 5, tftWidth - 10, tftHeight - 10, TFT_WHITE);
     tft.setTextColor(TFT_WHITE, bruceConfig.bgColor);
-    tft.setTextSize(2);
+    tft.setTextSize(responsiveTextSize(2));
     tft.setCursor((tftWidth - tft.textWidth("MESSAGE")) / 2, 15);
     tft.print("MESSAGE");
     tft.setTextSize(1);
@@ -6244,7 +6244,7 @@ void showWarningMessage(const char *message) {
     tft.fillScreen(TFT_YELLOW);
     tft.drawRect(5, 5, tftWidth - 10, tftHeight - 10, TFT_BLACK);
     tft.setTextColor(TFT_BLACK, TFT_YELLOW);
-    tft.setTextSize(2);
+    tft.setTextSize(responsiveTextSize(2));
     tft.setCursor((tftWidth - tft.textWidth("WARNING")) / 2, 15);
     tft.print("WARNING");
     tft.setTextSize(1);
@@ -6297,7 +6297,7 @@ void showErrorMessage(const char *message) {
     tft.fillScreen(TFT_RED);
     tft.drawRect(5, 5, tftWidth - 10, tftHeight - 10, TFT_BLACK);
     tft.setTextColor(TFT_WHITE, TFT_RED);
-    tft.setTextSize(2);
+    tft.setTextSize(responsiveTextSize(2));
     tft.setCursor((tftWidth - tft.textWidth("ERROR")) / 2, 15);
     tft.print("ERROR");
     tft.setTextSize(1);
@@ -6349,7 +6349,7 @@ void showSuccessMessage(const char *message) {
     tft.fillScreen(TFT_GREEN);
     tft.drawRect(5, 5, tftWidth - 10, tftHeight - 10, TFT_BLACK);
     tft.setTextColor(TFT_WHITE, TFT_GREEN);
-    tft.setTextSize(2);
+    tft.setTextSize(responsiveTextSize(2));
     tft.setCursor((tftWidth - tft.textWidth("SUCCESS")) / 2, 15);
     tft.print("SUCCESS");
     tft.setTextSize(1);
@@ -6404,7 +6404,7 @@ void showDeviceInfoScreen(
     tft.drawRect(5, 5, tftWidth - 10, tftHeight - 10, TFT_WHITE);
 
     tft.setTextColor(TFT_WHITE, bgColor);
-    tft.setTextSize(2);
+    tft.setTextSize(responsiveTextSize(2));
     tft.setCursor((tftWidth - tft.textWidth(title)) / 2, 15);
     tft.print(title);
     tft.setTextSize(1);

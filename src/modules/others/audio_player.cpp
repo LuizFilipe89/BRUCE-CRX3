@@ -323,12 +323,13 @@ void musicPlayerUI(FS *fs, const String &filepath) {
         int boxSize = iconSize + 45; // Wider box towards right
         tft.drawRoundRect(ui.MARGIN_X, y + 2, boxSize, iconSize, 4, TFT_DARKGREY);
         tft.setTextColor(TFT_WHITE);
-        tft.setTextSize(2);
+        tft.setTextSize(responsiveTextSize(2));
 
         // Center "AUDIO" text in box
         String AudioFormatLabel = "AUDIO";              // TODO: Use file extension
-        int textWidth = AudioFormatLabel.length() * 12; // textSize(2): 6 pixel base * 2 = 12 pixel per char
-        int textHeight = 16;                            // textSize(2): 8 pixel base * 2 = 16 pixel
+        int activeTextSize = responsiveTextSize(2);
+        int textWidth = AudioFormatLabel.length() * 6 * activeTextSize;
+        int textHeight = 8 * activeTextSize;
         int centerX = ui.MARGIN_X + (boxSize - textWidth) / 2 + 2; // Offset 5
         int centerY = y + 2 + (iconSize - textHeight) / 2;
         tft.setCursor(centerX, centerY);

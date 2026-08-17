@@ -1430,7 +1430,7 @@ void PresenterMode(HIDInterface *&hid, bool ble) {
     auto updateSlideDisplay = [&]() {
         tft.fillRect(0, tftHeight / 2 - 35, tftWidth, 40, bruceConfig.bgColor);
 
-        tft.setTextSize(4);
+        tft.setTextSize(responsiveTextSize(4));
         tft.setTextColor(TFT_WHITE, bruceConfig.bgColor);
         String slideStr = "Slide " + String(currentSlide);
         tft.drawCentreString(slideStr, tftWidth / 2, tftHeight / 2 - 30, 1);
@@ -1453,7 +1453,7 @@ void PresenterMode(HIDInterface *&hid, bool ble) {
         }
 
         tft.fillRect(0, tftHeight / 2 + 30, tftWidth, 30, bruceConfig.bgColor);
-        tft.setTextSize(3);
+        tft.setTextSize(responsiveTextSize(3));
         tft.setTextColor(timerStarted ? TFT_GREEN : TFT_DARKGREY, bruceConfig.bgColor);
         tft.drawCentreString(timeBuffer, tftWidth / 2, tftHeight / 2 + 35, 1);
 

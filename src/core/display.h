@@ -27,6 +27,8 @@ struct Opt_Coord {
     uint16_t bgcolor = bruceConfig.bgColor;
 };
 void displayScrollingText(const String &text, Opt_Coord &coord, bool highlight = false);
+String fitTextToWidth(const String &text, int maxWidth, uint8_t textSize = FP);
+uint8_t responsiveTextSize(uint8_t preferredSize);
 
 #if !defined(LITE_VERSION)
 
