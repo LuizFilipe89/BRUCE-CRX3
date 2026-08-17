@@ -99,7 +99,11 @@ void RFJammer::setup() {
     }
 
     isCC1101 = (bruceConfigPins.rfModule == CC1101_SPI_MODULE);
-    if (isCC1101) { nTransmitterPin = bruceConfigPins.CC1101_bus.io0; }
+    if (isCC1101) {
+        nTransmitterPin = bruceConfigPins.CC1101_bus.io0;
+        // Apply precise calibration and wideband config for jamming (like sendRfCommand does)
+        prepareCC1101ForJamming(bruceConfigPins.rfFreq);
+    }
 
     sendRF = true;
     pulseCount = 0;
@@ -203,55 +207,79 @@ void RFJammer::update_display(uint32_t elapsedMs) {
 }
 
 // ── FULL POWER: Maximum duty cycle continuous TX ────────────────
-// Aggressive multi-pattern approach: alternates between sustained carrier,
-// rapid micro-glitches, and burst disruption patterns for maximum spectral
-// pollution across the widest bandwidth possible.
+// CC1101: Uses PN9 hardware random TX (continuous wideband noise).
+// RAW GPIO: Falls back to aggressive micro-glitch patterns.
 void RFJammer::run_full_jammer() {
-    digitalWrite(nTransmitterPin, HIGH);
     uint32_t startTime = millis();
     uint32_t lastCheckTime = startTime;
     uint32_t lastDisplayTime = startTime;
-    uint8_t phase = 0; // Cycle through 3 attack phases
+
+    if (!isCC1101) {
+        digitalWrite(nTransmitterPin, HIGH);
+    }
 
     while (sendRF) {
         uint32_t currentTime = millis();
         uint32_t elapsed = currentTime - startTime;
 
-        // Phase rotation every 100ms for maximum spectral diversity
-        phase = (elapsed / 100) % 3;
-
-        switch (phase) {
-            case 0:
-                // Phase A: Ultra-rapid micro-glitches (1µs LOW every 4µs)
-                for (int i = 0; i < 100 && sendRF; i++) {
+        if (!isCC1101) {
+            // RAW GPIO: aggressive multi-pattern (original behavior)
+            uint8_t phase = (elapsed / 100) % 3;
+            switch (phase) {
+                case 0: // Ultra-rapid micro-glitches
+                    for (int i = 0; i < 100 && sendRF; i++) {
+                        digitalWrite(nTransmitterPin, HIGH);
+                        delayMicroseconds(3);
+                        digitalWrite(nTransmitterPin, LOW);
+                        delayMicroseconds(1);
+                        pulseCount++;
+                    }
+                    break;
+                case 1: // Variable-width burst disruption
+                    for (int i = 0; i < 50 && sendRF; i++) {
+                        uint32_t w = 2 + (micros() % 18);
+                        digitalWrite(nTransmitterPin, HIGH);
+                        delayMicroseconds(w);
+                        digitalWrite(nTransmitterPin, LOW);
+                        delayMicroseconds(1);
+                        pulseCount++;
+                    }
+                    break;
+                case 2: // Sustained carrier with hard cuts
                     digitalWrite(nTransmitterPin, HIGH);
-                    delayMicroseconds(3);
+                    delayMicroseconds(80);
                     digitalWrite(nTransmitterPin, LOW);
-                    delayMicroseconds(1);
-                    pulseCount++;
-                }
-                break;
-            case 1:
-                // Phase B: Variable-width burst disruption (2-20µs pulses)
-                for (int i = 0; i < 50 && sendRF; i++) {
-                    uint32_t w = 2 + (micros() % 18);
+                    delayMicroseconds(2);
                     digitalWrite(nTransmitterPin, HIGH);
-                    delayMicroseconds(w);
-                    digitalWrite(nTransmitterPin, LOW);
-                    delayMicroseconds(1);
-                    pulseCount++;
-                }
-                break;
-            case 2:
-                // Phase C: Sustained carrier with periodic hard cuts
-                digitalWrite(nTransmitterPin, HIGH);
-                delayMicroseconds(80);
-                digitalWrite(nTransmitterPin, LOW);
-                delayMicroseconds(2);
-                digitalWrite(nTransmitterPin, HIGH);
-                delayMicroseconds(80);
-                pulseCount += 2;
-                break;
+                    delayMicroseconds(80);
+                    pulseCount += 2;
+                    break;
+            }
+        } else {
+            // CC1101: PN9 runs in hardware, just cycle modulation for spectral diversity
+            static uint8_t modCycle = 0;
+            static const uint8_t modSchemes[] = {2, 0, 1}; // ASK, 2FSK, MSK
+            uint8_t newMod = (elapsed / 3000) % 3;
+            if (newMod != modCycle) {
+                modCycle = newMod;
+                ELECHOUSE_cc1101.setSidle();
+                ELECHOUSE_cc1101.setModulation(modSchemes[modCycle]);
+                ELECHOUSE_cc1101.SetTx();
+                // Update display badge
+                static const char *modNames[] = {"ASK/OOK", "2-FSK", "MSK"};
+                int y = BORDER_PAD_Y + FM * LH + 4 + max(14, tftHeight / 10) * 4;
+                int lineH = max(14, tftHeight / 10);
+                uint16_t accent = getComplementaryColor2(bruceConfig.priColor);
+                tft.fillRect(7, y, tftWidth - 14, lineH, bruceConfig.bgColor);
+                tft.fillCircle(tftWidth / 2 - 50, y + lineH / 2, 4, accent);
+                tft.setTextColor(accent, bruceConfig.bgColor);
+                tft.setTextSize(FP);
+                char modBuf[30];
+                snprintf(modBuf, sizeof(modBuf), "PN9 %s TX", modNames[modCycle]);
+                tft.drawString(modBuf, tftWidth / 2 - 38, y + 2, 1);
+            }
+            pulseCount = elapsed / 10; // Approximate
+            delay(10);
         }
 
         if (currentTime - lastCheckTime > 100) {
@@ -270,10 +298,18 @@ void RFJammer::run_full_jammer() {
 
         if (currentTime - startTime > MAX_JAMMER_RUNTIME) break;
     }
-    digitalWrite(nTransmitterPin, LOW);
+
+    if (!isCC1101) {
+        digitalWrite(nTransmitterPin, LOW);
+    } else {
+        ELECHOUSE_cc1101.setSidle();
+        ELECHOUSE_cc1101.SpiWriteReg(CC1101_PKTCTRL0, 0x30); // Restore async serial mode
+    }
 }
 
 // ── INTERMITTENT: Varied pulse patterns + bursts ────────────────
+// CC1101: Uses pulsed PN9 bursts with modulation cycling.
+// RAW GPIO: Original micro-glitch sweep patterns.
 void RFJammer::run_itmt_jammer() {
     uint32_t startTime = millis();
     uint32_t lastCheckTime = startTime;
@@ -283,12 +319,21 @@ void RFJammer::run_itmt_jammer() {
     for (uint32_t i = 0; i < MAX_SEQUENCE; i++) { sequenceValues[i] = 10 * (i + 1); }
 
     while (sendRF) {
-        // Forward sweep: 10µs → 500µs
+        // Forward sweep: 10ms → 500ms burst intervals
         for (uint32_t sequence = 0; sequence < MAX_SEQUENCE && sendRF; sequence++) {
-            uint32_t pulseWidth = sequenceValues[sequence];
+            uint32_t burstInterval = sequenceValues[sequence];
 
             for (uint32_t duration = 0; duration < DURATION_CYCLES && sendRF; duration++) {
-                send_optimized_pulse(pulseWidth);
+                if (!isCC1101) {
+                    send_optimized_pulse(burstInterval);
+                } else {
+                    // CC1101: Short PN9 burst
+                    ELECHOUSE_cc1101.setSidle();
+                    ELECHOUSE_cc1101.SpiWriteReg(CC1101_PKTCTRL0, 0x32); // PN9 mode
+                    ELECHOUSE_cc1101.SetTx();
+                    delayMicroseconds(burstInterval);
+                    ELECHOUSE_cc1101.setSidle();
+                }
                 pulseCount++;
 
                 uint32_t currentTime = millis();
@@ -308,9 +353,18 @@ void RFJammer::run_itmt_jammer() {
             }
         }
 
-        // Reverse sweep: 500µs → 10µs for chirp effect
+        // Reverse sweep: 500ms → 10ms for chirp effect
         for (int sequence = MAX_SEQUENCE - 1; sequence >= 0 && sendRF; sequence--) {
-            send_optimized_pulse(sequenceValues[sequence]);
+            uint32_t burstInterval = sequenceValues[sequence];
+            if (!isCC1101) {
+                send_optimized_pulse(burstInterval);
+            } else {
+                ELECHOUSE_cc1101.setSidle();
+                ELECHOUSE_cc1101.SpiWriteReg(CC1101_PKTCTRL0, 0x32);
+                ELECHOUSE_cc1101.SetTx();
+                delayMicroseconds(burstInterval);
+                ELECHOUSE_cc1101.setSidle();
+            }
             pulseCount++;
 
             uint32_t currentTime = millis();
@@ -330,13 +384,29 @@ void RFJammer::run_itmt_jammer() {
 
         // Random noise burst
         if (sendRF) {
-            send_random_pattern(200);
+            if (!isCC1101) {
+                send_random_pattern(200);
+            } else {
+                // CC1101: Longer PN9 burst with modulation cycling
+                ELECHOUSE_cc1101.setSidle();
+                ELECHOUSE_cc1101.setModulation(2); // ASK
+                ELECHOUSE_cc1101.SpiWriteReg(CC1101_PKTCTRL0, 0x32);
+                ELECHOUSE_cc1101.SetTx();
+                delay(200);
+                ELECHOUSE_cc1101.setSidle();
+            }
             pulseCount += 200;
         }
 
         if (millis() - startTime > MAX_JAMMER_RUNTIME) break;
     }
-    digitalWrite(nTransmitterPin, LOW);
+
+    if (!isCC1101) {
+        digitalWrite(nTransmitterPin, LOW);
+    } else {
+        ELECHOUSE_cc1101.setSidle();
+        ELECHOUSE_cc1101.SpiWriteReg(CC1101_PKTCTRL0, 0x30); // Restore async serial mode
+    }
 }
 
 // ── NOISE STORM: CC1101 PN9 hardware random TX ─────────────────
@@ -421,7 +491,7 @@ void RFJammer::run_noise_jammer() {
 // ── FREQ SWEEP: Hop around target frequency ─────────────────────
 // Sweeps ±5MHz around the configured frequency in 50kHz steps.
 // Alternates sweep direction each pass for maximum coverage.
-// TX burst at each step creates wideband interference.
+// Uses CC1101 SetTx() at each frequency (not GPIO toggle).
 void RFJammer::run_sweep_jammer() {
     if (!isCC1101) return;
 
@@ -432,8 +502,14 @@ void RFJammer::run_sweep_jammer() {
     float currentFreq = sweepMin;
     bool sweepForward = true;
 
-    // Maximum CC1101 TX power
+    // Apply precise calibration once at start, then use setMHZ for hops
+    cc1101ApplyPreciseCalibration(baseFreq, true);
+    ELECHOUSE_cc1101.setModulation(2);     // ASK/OOK
+    ELECHOUSE_cc1101.setDeviation(47.6);
+    ELECHOUSE_cc1101.setRxBW(812);
+    ELECHOUSE_cc1101.setDRate(800);
     ELECHOUSE_cc1101.setPA(12);
+    ELECHOUSE_cc1101.SpiWriteReg(CC1101_PKTCTRL0, 0x32); // PN9 mode
 
     uint32_t startTime = millis();
     uint32_t lastCheckTime = startTime;
@@ -441,18 +517,18 @@ void RFJammer::run_sweep_jammer() {
 
     // Start TX on first frequency
     ELECHOUSE_cc1101.setMHZ(currentFreq);
-    digitalWrite(nTransmitterPin, HIGH);
+    ELECHOUSE_cc1101.SetTx();
 
     while (sendRF) {
-        // Sweep frequency
+        // Sweep frequency (must be in IDLE to change freq)
+        ELECHOUSE_cc1101.setSidle();
+        cc1101WaitForIdle();
         ELECHOUSE_cc1101.setMHZ(currentFreq);
+        ELECHOUSE_cc1101.SetTx();
 
-        // TX burst at each frequency — 40 pulses with tight timing
+        // TX burst at each frequency
         for (int burst = 0; burst < 40 && sendRF; burst++) {
-            digitalWrite(nTransmitterPin, HIGH);
-            delayMicroseconds(30);
-            digitalWrite(nTransmitterPin, LOW);
-            delayMicroseconds(5);
+            delayMicroseconds(35); // 30us HIGH + 5us LOW ≈ 35us per pulse
             pulseCount++;
         }
 
@@ -486,7 +562,6 @@ void RFJammer::run_sweep_jammer() {
         if (currentTime - lastDisplayTime >= 500) {
             lastDisplayTime = currentTime;
 
-            // Update frequency display on sweep
             int y = BORDER_PAD_Y + FM * LH + 4;
             int lineH = max(14, tftHeight / 10);
             y += lineH; // Freq line
@@ -503,8 +578,8 @@ void RFJammer::run_sweep_jammer() {
         if (currentTime - startTime > MAX_JAMMER_RUNTIME) break;
     }
 
-    digitalWrite(nTransmitterPin, LOW);
-    // Restore original frequency
+    ELECHOUSE_cc1101.setSidle();
+    ELECHOUSE_cc1101.SpiWriteReg(CC1101_PKTCTRL0, 0x30); // Restore async serial mode
     ELECHOUSE_cc1101.setMHZ(baseFreq);
 }
 

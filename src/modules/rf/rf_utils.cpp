@@ -612,3 +612,62 @@ void rf_range_selection(float currentFrequency) {
 // keeloq_encrypt / keeloq_decrypt / keeloq_normal_learning moved to
 // protocols/rf_keeloq.cpp (declared via protocols/rf_keeloq.h, included by
 // rf_utils.h). reverse_bits stays here since it is a general bit helper.
+
+// ── Jammer: Prepare CC1101 for wideband jamming ───────────────────
+// Applies same calibration path as setMHZ() + sendRfCommand(): precise
+// calibration for the band, max PA, wideband modulation (ASK/OOK PN9).
+void prepareCC1101ForJamming(float frequencyMHz) {
+    if (bruceConfigPins.rfModule != CC1101_SPI_MODULE) return;
+
+    // Ensure we're in IDLE before changing frequency/registers
+    ELECHOUSE_cc1101.setSidle();
+    cc1101WaitForIdle();
+
+    // Apply precise calibration for this frequency band (same as setMHZ)
+    cc1101ApplyPreciseCalibration(frequencyMHz, true);
+
+    // Wideband jamming config: ASK/OOK, max deviation, wide RX BW, max PA
+    ELECHOUSE_cc1101.setModulation(2);        // ASK/OOK
+    ELECHOUSE_cc1101.setDeviation(47.6);      // Max deviation
+    ELECHOUSE_cc1101.setRxBW(812);            // Widest bandwidth
+    ELECHOUSE_cc1101.setDRate(800);           // High data rate = wide occupied BW
+    ELECHOUSE_cc1101.setPA(12);               // Max TX power
+
+    // PN9 random TX mode: async serial, no whitening, no CRC, fixed length
+    // PKTCTRL0: bits[5:4:3]=011 (PN9), bit[2]=0 (no CRC), bits[1:0]=00 (fixed len)
+    ELECHOUSE_cc1101.SpiWriteReg(CC1101_PKTCTRL0, 0x32);
+
+    // Flush TX FIFO and enter TX
+    ELECHOUSE_cc1101.SpiStrobe(CC1101_SFTX);
+    ELECHOUSE_cc1101.SetTx();
+
+    debugCC1101State("JAMMER TX READY");
+}
+
+// ── Debug: Print CC1101 radio state ───────────────────────────────
+void debugCC1101State(const char *label) {
+    if (bruceConfigPins.rfModule != CC1101_SPI_MODULE) return;
+
+    uint8_t marcstate = ELECHOUSE_cc1101.SpiReadStatus(CC1101_MARCSTATE) & 0x1F;
+    uint8_t pktctrl0  = ELECHOUSE_cc1101.SpiReadReg(CC1101_PKTCTRL0);
+    uint8_t mdmcfg1   = ELECHOUSE_cc1101.SpiReadReg(CC1101_MDMCFG1);
+    uint8_t mdmcfg2   = ELECHOUSE_cc1101.SpiReadReg(CC1101_MDMCFG2);
+    uint8_t freq2     = ELECHOUSE_cc1101.SpiReadReg(CC1101_FREQ2);
+    uint8_t freq1     = ELECHOUSE_cc1101.SpiReadReg(CC1101_FREQ1);
+    uint8_t freq0     = ELECHOUSE_cc1101.SpiReadReg(CC1101_FREQ0);
+    uint8_t pa_table  = ELECHOUSE_cc1101.SpiReadReg(CC1101_PATABLE);
+
+    static const char *marc_names[] = {
+        "SLEEP", "IDLE", "XOFF", "VCOON_MC", "REGON_MC", "MANCAL", "VCOON", "REGON",
+        "STARTCAL", "BWBOOST", "FS_LOCK", "IFADCON", "ENDCAL", "RX", "RX_END",
+        "RX_RST", "TXRX_SW", "RXFIFO_OVERFLOW", "FIFO_UNDERFLOW", "TX", "TX_END",
+        "RXTX_SW", "TXFIFO_UNDERFLOW"
+    };
+
+    float freq = ((uint32_t)freq2 << 16 | (uint32_t)freq1 << 8 | freq0) * 26e6 / (1UL << 16) / 1e6;
+
+    Serial.printf("[CC1101 DBG] %s: MARC=%s(0x%02X) FREQ=%.3fMHz PKTCTRL0=0x%02X MDMCFG1=0x%02X MDMCFG2=0x%02X PATABLE=0x%02X\n",
+                  label,
+                  (marcstate < 22) ? marc_names[marcstate] : "UNKNOWN",
+                  marcstate, freq, pktctrl0, mdmcfg1, mdmcfg2, pa_table);
+}

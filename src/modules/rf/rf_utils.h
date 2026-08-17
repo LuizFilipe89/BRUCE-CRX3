@@ -36,4 +36,12 @@ uint64_t reverse_bits(uint64_t num, uint8_t bits);
 
 String rf_subghz_header(float frequencyMHz);
 
+// Jammer helpers
+void prepareCC1101ForJamming(float frequencyMHz);
+void debugCC1101State(const char *label);
+
+// CC1101 calibration helpers (used by jammer)
+void cc1101ApplyPreciseCalibration(float frequency, bool isTx);
+void cc1101WaitForIdle();
+
 #endif
